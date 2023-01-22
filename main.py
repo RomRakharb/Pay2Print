@@ -1,41 +1,71 @@
 import keyboard
 import win32print
 import serial
-import tkinter as tk
-from tkinter import ttk
 import threading
 import time
-
-min_v = 1000
-printer_status = 1
-total_bath = 0
-total_pages = 0
+import PySimpleGUI as sg
 
 
+class Printer:
+    @staticmethod
+    def init():
+        print('enter init')
+        while True:
+            for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL, None, 1):
+                flags, desc, name, comment = p
+                phandle = win32print.OpenPrinter(name)
+                print_jobs = win32print.EnumJobs(phandle, 0, -1, 1)
+                for job in print_jobs:
+                    win32print.SetJob(phandle, job['JobId'], 0, None, 1)
+                    if job['Status'] != 1:
+                        print(job['TotalPages'])
+                        time.sleep(1)
+                        continue
+                    return phandle, job
+
+    @staticmethod
+    def printing(phandle, job_id):
+        win32print.SetJob(phandle, job_id, 0, None, 2)
+
+    @staticmethod
+    def cancel(phandle, job_id):
+        win32print.SetJob(phandle, job_id, 0, None, 3)
 
 
-def printer_control():
-    pay = threading.Thread(target=window, daemon=True)
-    while True:
-        global printer_status, total_pages
-        for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL, None, 1):
-            flags, desc, name, comment = p
-            phandle = win32print.OpenPrinter(name)
-            print_jobs = win32print.EnumJobs(phandle, 0, -1, 1)
-            for job in print_jobs:
-                win32print.SetJob(phandle, job['JobId'], 0, None, printer_status)
-                if not pay.is_alive():
-                    print(pay.is_alive())
-                    pay.start()
-                if job['Status'] != 1:
-                    total_pages = job['TotalPages']
-                    print(job['TotalPages'])
-                    time.sleep(1)
-                    continue
-                print(job)
-                # pause job 1
-                # print 2
-                # cancel 3
+class Window:
+    @staticmethod
+    def init():
+        layout = [
+            [sg.Text('Choose port')]
+        ]
+        window = sg.Window('Title', layout)
+        while True:
+            event, values = window.read()
+            if event == sg.WIN_CLOSED:
+                break
+        window.close()
+
+    @staticmethod
+    def pay():
+        i = 0
+        font = ("Arial", 50)
+        layout = [
+            [sg.Text('จำนวนหน้า', font=font)],
+            [sg.Text(i, font=font, key='i')],
+            [sg.Button('ยกเลิก', font=font)]
+        ]
+        window = sg.Window('Title', layout, no_titlebar=True, element_justification='center',
+                           finalize=True)
+        window.Maximize()
+        while True:
+            event, values = window.read(timeout=10)
+            if event == sg.WIN_CLOSED or event == 'ยกเลิก':
+                print('break')
+                break
+            i += 1
+            window['i'].update(i)
+            time.sleep(1)
+        window.close()
 
 
 def read_serial():
@@ -50,60 +80,8 @@ def read_serial():
         pass
 
 
-def disable_closing():
-    pass
-    # keyboard.add_hotkey("alt + f4", lambda: None, suppress=True)
-    # keyboard.add_hotkey("alt + tab", lambda: None, suppress=True)
-    # keyboard.add_hotkey("ctrl + shift + esc", lambda: None, suppress=True)
-    # keyboard.add_hotkey("windows + tab", lambda: None, suppress=True)
-
-    # keyboard.remove_hotkey("alt + tab")
-
-
-def on_cancel(win):
-    win.destroy
-
-
-def window():
-    win = tk.Tk()
-    global total_bath, total_pages
-    win.attributes('-fullscreen', True)
-    win.title('Pay2Print')
-    disable_closing()
-
-    button_style = ttk.Style()
-    button_style.configure('my.TButton', font=("TH Sarabun New", 50))
-
-    label_style = ttk.Style()
-    label_style.configure('my.TLabel', font=("TH Sarabun New", 50))
-
-    page_left = ttk.Label(win, text=f"คงเหลือ {total_pages - total_bath} บาท", style='my.TLabel')
-    def on_cancel():
-        win.destroy()
-        return 3
-
-    cancel_button = ttk.Button(win, text='ยกเลิก', style='my.TButton', command=on_cancel)
-
-    page_left.pack(expand=True)
-    cancel_button.pack(expand=True)
-
-    page_left.config(text=f"คงเหลือ {total_pages - total_bath} บาท")
-    # if total_pages - total_bath <= 0:
-    #     win.destroy
-    #     return 2
-
-    win.mainloop()
-
-
 if __name__ == "__main__":
-    # x = threading.Thread(target=read_serial)
-    # # x.start()
-    printer_control()
-    # window()
-        # x = printer_control()
-        # time.sleep(1)
-
-
-    # while True:
-    #     read_serial()
-    # pass
+    Window.pay()
+    pass
+    # phandle, job = Printer.init()
+    # print(job)
