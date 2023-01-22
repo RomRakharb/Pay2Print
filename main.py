@@ -5,10 +5,12 @@ import threading
 import time
 import PySimpleGUI as sg
 
-
+total_pages = 0
+total_bath = 0
 class Printer:
     @staticmethod
     def init():
+        global total_pages
         print('enter init')
         while True:
             for p in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL, None, 1):
@@ -18,8 +20,7 @@ class Printer:
                 for job in print_jobs:
                     win32print.SetJob(phandle, job['JobId'], 0, None, 1)
                     if job['Status'] != 1:
-                        print(job['TotalPages'])
-                        time.sleep(1)
+                        total_pages = job['TotalPages']
                         continue
                     return phandle, job
 
@@ -47,29 +48,32 @@ class Window:
 
     @staticmethod
     def pay():
-        i = 0
+        global total_pages
         font = ("Arial", 50)
-        layout = [
+
+        elements = [
             [sg.Text('จำนวนหน้า', font=font)],
-            [sg.Text(i, font=font, key='i')],
+            [sg.Text(total_pages, font=font, key='TotalPages', border_width=100)],
             [sg.Button('ยกเลิก', font=font)]
         ]
-        window = sg.Window('Title', layout, no_titlebar=True, element_justification='center',
-                           finalize=True)
+
+        layout = [[sg.VPush()],
+                  [sg.Push(), sg.Column(elements, element_justification='c'), sg.Push()],
+                  [sg.VPush()]]
+        window = sg.Window('Title', layout, no_titlebar=True, finalize=True)
         window.Maximize()
         while True:
             event, values = window.read(timeout=10)
             if event == sg.WIN_CLOSED or event == 'ยกเลิก':
-                print('break')
+                print('close')
                 break
-            i += 1
-            window['i'].update(i)
+            window['TotalPages'].update(total_pages)
             time.sleep(1)
         window.close()
 
 
 def read_serial():
-    global min_v, total_bath
+    global total_bath
     with serial.Serial('COM3', 9600) as ser:
         x = ser.readline()
     count = str(x).replace("b'", '').replace(' ', '').replace("\\r\\n'", '')
@@ -81,7 +85,12 @@ def read_serial():
 
 
 if __name__ == "__main__":
-    Window.pay()
-    pass
+    threading.Thread(target=Printer.init).start()
+    while True:
+        if total_pages > 0:
+            Window.pay()
+            break
+            # print(f"The total pages is {total_pages}")
+            # time.sleep(1)
     # phandle, job = Printer.init()
     # print(job)
